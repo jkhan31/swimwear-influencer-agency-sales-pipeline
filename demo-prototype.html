@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agency Outreach Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --coral: #D85A30;
+    --bg: #0e0e0e;
+    --bg2: #161616;
+    --bg3: #1e1e1e;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0ede8;
+    --text2: #888680;
+    --text3: #555350;
+    --green: #639922;
+    --blue: #378ADD;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  header {
+    border-bottom: 0.5px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .header-title { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
+  .header-sub { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-top: 2px; }
+
+  .demo-badge {
+    font-size: 10px; font-family: var(--mono);
+    background: rgba(216,90,48,0.15); color: var(--coral);
+    border: 0.5px solid rgba(216,90,48,0.3);
+    padding: 3px 10px; border-radius: 20px;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+
+  main { max-width: 900px; margin: 0 auto; padding: 28px 24px; }
+
+  .grid { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+
+  .section-label {
+    font-size: 10px; font-family: var(--mono); color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px;
+  }
+
+  .form-panel {
+    background: var(--bg2); border: 0.5px solid var(--border);
+    border-radius: 12px; padding: 18px;
+  }
+
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 5px; font-family: var(--mono); }
+
+  .field input, .field select {
+    width: 100%; background: var(--bg3); border: 0.5px solid var(--border2);
+    border-radius: 6px; padding: 8px 10px; color: var(--text);
+    font-family: var(--sans); font-size: 13px; outline: none; appearance: none;
+    transition: border-color 0.15s;
+  }
+
+  .field input:focus, .field select:focus { border-color: rgba(216,90,48,0.5); }
+  .field input::placeholder { color: var(--text3); }
+  select option { background: #1e1e1e; }
+
+  .generate-btn {
+    width: 100%; background: var(--coral); color: white; border: none;
+    border-radius: 6px; padding: 10px; font-family: var(--sans);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s; margin-top: 4px; letter-spacing: -0.01em;
+  }
+  .generate-btn:hover { opacity: 0.88; }
+  .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .output-area { display: flex; flex-direction: column; gap: 14px; }
+
+  .empty-state {
+    background: var(--bg2); border: 0.5px dashed var(--border2);
+    border-radius: 12px; height: 220px; display: flex;
+    align-items: center; justify-content: center;
+    color: var(--text3); font-size: 13px; font-family: var(--mono);
+  }
+
+  .loading-state {
+    background: var(--bg2); border: 0.5px solid var(--border);
+    border-radius: 12px; height: 220px; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; color: var(--text2); font-family: var(--mono); font-size: 12px;
+  }
+
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2px solid rgba(216,90,48,0.2);
+    border-top-color: var(--coral); border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .cards-grid { display: none; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .msg-card {
+    background: var(--bg2); border: 0.5px solid var(--border);
+    border-radius: 10px; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+    transition: border-color 0.2s;
+  }
+  .msg-card.approved { border-color: rgba(99,153,34,0.5); }
+
+  .card-header { display: flex; align-items: center; justify-content: space-between; }
+  .card-label { font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .approved-badge {
+    display: none; font-size: 9px; font-family: var(--mono);
+    background: rgba(99,153,34,0.15); color: #639922;
+    border: 0.5px solid rgba(99,153,34,0.3);
+    padding: 2px 7px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  .subject-line { font-size: 11px; font-family: var(--mono); color: var(--text3); border-left: 2px solid rgba(216,90,48,0.4); padding-left: 8px; }
+  .subject-line span { color: var(--text2); }
+
+  .msg-text { font-size: 12px; color: var(--text2); line-height: 1.6; flex: 1; white-space: pre-wrap; }
+  .msg-textarea {
+    width: 100%; background: var(--bg3); border: 0.5px solid var(--border2);
+    border-radius: 6px; padding: 8px; color: var(--text);
+    font-family: var(--mono); font-size: 11px; line-height: 1.6; resize: none; outline: none;
+  }
+
+  .word-count { font-size: 10px; font-family: var(--mono); color: var(--text3); }
+
+  .card-actions { display: flex; gap: 6px; }
+
+  .btn-sm {
+    flex: 1; background: var(--bg3); border: 0.5px solid var(--border2);
+    border-radius: 5px; padding: 6px 4px; color: var(--text2);
+    font-family: var(--mono); font-size: 10px; cursor: pointer;
+    transition: all 0.15s; text-align: center;
+  }
+  .btn-sm:hover { background: #2a2a2a; color: var(--text); }
+  .btn-sm:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-sm.approve { background: rgba(99,153,34,0.12); border-color: rgba(99,153,34,0.3); color: #639922; }
+  .btn-sm.approve:hover { background: rgba(99,153,34,0.2); }
+
+  .pipeline-section { margin-top: 28px; display: none; }
+  .pipeline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .pipeline-count {
+    font-size: 10px; font-family: var(--mono);
+    background: rgba(216,90,48,0.15); color: var(--coral);
+    border: 0.5px solid rgba(216,90,48,0.25);
+    padding: 2px 8px; border-radius: 20px;
+  }
+
+  .pipeline-table { width: 100%; border: 0.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .pipeline-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .pipeline-table thead tr { background: var(--bg2); border-bottom: 0.5px solid var(--border); }
+  .pipeline-table th { padding: 9px 12px; text-align: left; font-size: 9px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+  .pipeline-table tbody tr { border-bottom: 0.5px solid var(--border); transition: background 0.1s; }
+  .pipeline-table tbody tr:last-child { border-bottom: none; }
+  .pipeline-table tbody tr:hover { background: var(--bg2); }
+  .pipeline-table td { padding: 10px 12px; color: var(--text2); vertical-align: top; }
+
+  .brand-cell { color: var(--text); font-weight: 500; }
+  .handle-cell { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+  .preview-cell { font-size: 11px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .time-cell { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+  .status-pill {
+    font-size: 9px; font-family: var(--mono); padding: 3px 8px;
+    border-radius: 20px; cursor: pointer; border: 0.5px solid transparent;
+    white-space: nowrap; transition: all 0.15s;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .status-approved { background: rgba(99,153,34,0.12); color: #639922; border-color: rgba(99,153,34,0.3); }
+  .status-sent { background: rgba(55,138,221,0.12); color: #378ADD; border-color: rgba(55,138,221,0.3); }
+
+  .rate-limit-msg {
+    display: none; background: rgba(216,90,48,0.08);
+    border: 0.5px solid rgba(216,90,48,0.25); border-radius: 8px;
+    padding: 12px 14px; font-size: 12px; color: var(--text2); line-height: 1.6;
+  }
+  .rate-limit-msg a { color: var(--coral); text-decoration: none; }
+  .rate-limit-msg a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="header-title">Agency Outreach Generator</div>
+    <div class="header-sub">Powered by Claude AI — Swimwear Influencer Agency</div>
+  </div>
+  <span class="demo-badge">Demo</span>
+</header>
+
+<main>
+  <div class="grid">
+    <div>
+      <div class="section-label">Brand Details</div>
+      <div class="form-panel">
+        <div class="field">
+          <label>Brand Name *</label>
+          <input type="text" id="brandName" placeholder="e.g. Monday Swimwear" />
+        </div>
+        <div class="field">
+          <label>Instagram Handle</label>
+          <input type="text" id="handle" placeholder="e.g. mondayswimwear" />
+        </div>
+        <div class="field">
+          <label>Niche / Vibe *</label>
+          <select id="niche">
+            <option value="">Select niche...</option>
+            <option value="Swimwear">Swimwear</option>
+            <option value="Resort Wear">Resort Wear</option>
+            <option value="Sustainable Swimwear">Sustainable Swimwear</option>
+            <option value="Luxury Swimwear">Luxury Swimwear</option>
+            <option value="Surf & Active">Surf & Active</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Follower Count *</label>
+          <select id="followers">
+            <option value="">Select range...</option>
+            <option value="under 10K">Under 10K</option>
+            <option value="10K–100K">10K – 100K</option>
+            <option value="100K–500K">100K – 500K</option>
+            <option value="500K+">500K+</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Target Market *</label>
+          <select id="market">
+            <option value="">Select market...</option>
+            <option value="US">US</option>
+            <option value="EU">EU</option>
+            <option value="SEA">SEA</option>
+            <option value="Global">Global</option>
+          </select>
+        </div>
+        <button class="generate-btn" id="generateBtn" onclick="handleGenerate()">Generate Outreach</button>
+      </div>
+    </div>
+
+    <div class="output-area">
+      <div class="section-label">Generated Outreach</div>
+
+      <div id="emptyState" class="empty-state">fill in brand details and click generate</div>
+      <div id="loadingState" class="loading-state">
+        <div class="spinner"></div>
+        <span>crafting your outreach...</span>
+      </div>
+      <div id="rateLimitMsg" class="rate-limit-msg">
+        You've hit the demo limit (5 generations/hour). This tool is intentionally rate-limited. Want to see the full system? → <a href="https://jasonkhanani.com" target="_blank">jasonkhanani.com</a>
+      </div>
+
+      <div id="cardsGrid" class="cards-grid">
+        <div class="msg-card" id="dmCard">
+          <div class="card-header">
+            <span class="card-label">Instagram DM</span>
+            <span class="approved-badge" id="dmBadge">Approved</span>
+          </div>
+          <p class="msg-text" id="dmText"></p>
+          <div class="word-count" id="dmWords"></div>
+          <div class="card-actions">
+            <button class="btn-sm approve" id="dmApproveBtn" onclick="handleApprove('dm')">✓ approve</button>
+            <button class="btn-sm" id="dmEditBtn" onclick="handleEdit('dm')">✎ edit</button>
+            <button class="btn-sm" onclick="handleRegenerate()">↺ redo</button>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div class="msg-card" style="padding:10px 14px;flex-direction:row;align-items:center;gap:0;border-radius:8px;">
+            <div class="subject-line" id="emailSubject" style="border:none;padding:0;font-size:12px;"></div>
+          </div>
+          <div class="msg-card" id="emailCard">
+            <div class="card-header">
+              <span class="card-label">Cold Email</span>
+              <span class="approved-badge" id="emailBadge">Approved</span>
+            </div>
+            <p class="msg-text" id="emailText"></p>
+            <div class="word-count" id="emailWords"></div>
+            <div class="card-actions">
+              <button class="btn-sm approve" id="emailApproveBtn" onclick="handleApprove('email')">✓ approve</button>
+              <button class="btn-sm" id="emailEditBtn" onclick="handleEdit('email')">✎ edit</button>
+              <button class="btn-sm" onclick="handleRegenerate()">↺ redo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline-section" id="pipelineSection">
+    <div class="pipeline-header">
+      <div class="section-label" style="margin-bottom:0">Pipeline Log</div>
+      <span class="pipeline-count" id="pipelineCount">0 approved</span>
+    </div>
+    <div class="pipeline-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Brand</th>
+            <th>Niche</th>
+            <th>DM Preview</th>
+            <th>Email Preview</th>
+            <th>Status</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="pipelineBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+const SAMPLES = {
+  "monday": {
+    dm: "Hey Monday — your pieces have such a distinct identity; the minimal cuts and muted palette really stand out in a saturated market. We represent a tight roster of UGC creators and lifestyle influencers who shoot specifically in coastal and resort settings. A few of them are based in Bali and Byron Bay with engaged audiences in the 50K–200K range. Would love to explore a content collaboration — happy to share some creator profiles if it's a fit.",
+    email_subject: "Creator collab for Monday Swimwear",
+    email_body: "Hi Monday team,\n\nI run a boutique influencer agency focused exclusively on swimwear and resort brands. We represent a curated group of UGC creators and lifestyle influencers — all with high-engagement audiences and a track record of converting content into sales.\n\nGiven Monday's aesthetic, I think we have a few creators who would be a natural fit — particularly for coastal editorial and hotel-stay content.\n\nWould you be open to a quick 20-minute call to explore? I can share creator portfolios and discuss how we typically structure brand collaborations.\n\nBest,\nJason"
+  },
+  "frankies": {
+    dm: "Hey Frankies — the Y2K-meets-resort energy you've been putting out lately is doing numbers. We work with a select group of influencers and UGC creators who specialise in that nostalgic-luxe aesthetic — several with strong US and AU audiences. Would love to connect your next drop with the right faces. Open to a quick chat?",
+    email_subject: "Influencer partnership — Frankies Bikinis",
+    email_body: "Hi Frankies team,\n\nLove what the brand has been building — the aesthetic consistency across your recent campaigns is genuinely impressive.\n\nWe're a boutique influencer agency that places UGC creators and influencers with premium swimwear brands. Our roster skews lifestyle-forward with strong engagement in the US, Australia, and global beach markets.\n\nI'd love to share a few creator profiles I think would align with your visual direction. Are you currently exploring creator partnerships for your next season?\n\nLooking forward to connecting,\nJason"
+  },
+  "default": {
+    dm: "Hey {brand} — really love the direction you're taking with {niche}. We represent a curated roster of UGC creators and lifestyle influencers who specialise in coastal and resort content. Given your {followers} following and presence in the {market} market, I think we have some creators who'd be a natural fit for your next campaign. Would love to share a few profiles — open to a quick chat?",
+    email_subject: "Creator collaboration for {brand}",
+    email_body: "Hi {brand} team,\n\nI run a boutique influencer agency focused on swimwear and resort brands. We work with a tight roster of creators across {market} markets — all with strong engagement and content that actually converts.\n\nGiven your positioning in {niche}, I think there's a real fit here. Would love to share some creator portfolios and explore what a collaboration might look like.\n\nAre you currently working with influencers or UGC creators for upcoming campaigns?\n\nBest,\nJason"
+  }
+};
+
+let currentData = null, genCount = 0, pipeline = [];
+let dmApproved = false, emailApproved = false;
+let dmEditing = false, emailEditing = false;
+
+function wordCount(t) { return t.trim().split(/\s+/).filter(Boolean).length; }
+
+function getSample(brandData) {
+  const key = Object.keys(SAMPLES).find(k => k !== 'default' && brandData.brandName.toLowerCase().includes(k));
+  const t = SAMPLES[key || 'default'];
+  const fill = s => s.replace(/{brand}/g, brandData.brandName).replace(/{niche}/g, brandData.niche).replace(/{followers}/g, brandData.followers).replace(/{market}/g, brandData.market);
+  return { dm: fill(t.dm), email_subject: fill(t.email_subject), email_body: fill(t.email_body) };
+}
+
+function handleGenerate() {
+  const brandName = document.getElementById('brandName').value.trim();
+  const niche = document.getElementById('niche').value;
+  const followers = document.getElementById('followers').value;
+  const market = document.getElementById('market').value;
+  if (!brandName || !niche || !followers || !market) return;
+
+  if (genCount >= 5) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('cardsGrid').style.display = 'none';
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('rateLimitMsg').style.display = 'block';
+    return;
+  }
+
+  genCount++;
+  dmApproved = emailApproved = dmEditing = emailEditing = false;
+  currentData = { brandName, handle: document.getElementById('handle').value, niche, followers, market };
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('cardsGrid').style.display = 'none';
+  document.getElementById('rateLimitMsg').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('generateBtn').disabled = true;
+
+  setTimeout(() => {
+    const c = getSample(currentData);
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('cardsGrid').style.display = 'grid';
+    document.getElementById('generateBtn').disabled = false;
+
+    document.getElementById('dmText').textContent = c.dm;
+    document.getElementById('dmWords').textContent = wordCount(c.dm) + ' words';
+    document.getElementById('emailSubject').innerHTML = '<span style="color:var(--text3)">subj: </span>' + c.email_subject;
+    document.getElementById('emailText').textContent = c.email_body;
+    document.getElementById('emailWords').textContent = wordCount(c.email_body) + ' words';
+    document.getElementById('dmCard').className = 'msg-card';
+    document.getElementById('emailCard').className = 'msg-card';
+    document.getElementById('dmBadge').style.display = 'none';
+    document.getElementById('emailBadge').style.display = 'none';
+    document.getElementById('dmApproveBtn').disabled = false;
+    document.getElementById('emailApproveBtn').disabled = false;
+  }, 1600);
+}
+
+function handleRegenerate() { if (currentData) handleGenerate(); }
+
+function handleApprove(type) {
+  if (type === 'dm') {
+    dmApproved = true;
+    document.getElementById('dmCard').className = 'msg-card approved';
+    document.getElementById('dmBadge').style.display = 'inline';
+    document.getElementById('dmApproveBtn').disabled = true;
+  } else {
+    emailApproved = true;
+    document.getElementById('emailCard').className = 'msg-card approved';
+    document.getElementById('emailBadge').style.display = 'inline';
+    document.getElementById('emailApproveBtn').disabled = true;
+  }
+  if (currentData && !pipeline.find(p => p.brandName === currentData.brandName)) {
+    pipeline.push({
+      brandName: currentData.brandName,
+      handle: currentData.handle || '—',
+      niche: currentData.niche,
+      dm: document.getElementById('dmText').textContent.substring(0, 52) + '...',
+      email: document.getElementById('emailText').textContent.substring(0, 52) + '...',
+      status: 'Approved',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+    renderPipeline();
+  }
+}
+
+function handleEdit(type) {
+  if (type === 'dm') {
+    dmEditing = !dmEditing;
+    const p = document.getElementById('dmText');
+    const btn = document.getElementById('dmEditBtn');
+    if (dmEditing) {
+      const ta = document.createElement('textarea');
+      ta.className = 'msg-textarea'; ta.rows = 6; ta.id = 'dmTA';
+      ta.value = p.textContent; p.replaceWith(ta); btn.textContent = '✓ done';
+    } else {
+      const ta = document.getElementById('dmTA');
+      const np = document.createElement('p');
+      np.className = 'msg-text'; np.id = 'dmText'; np.textContent = ta.value;
+      ta.replaceWith(np); document.getElementById('dmWords').textContent = wordCount(ta.value) + ' words';
+      btn.textContent = '✎ edit';
+    }
+  } else {
+    emailEditing = !emailEditing;
+    const p = document.getElementById('emailText');
+    const btn = document.getElementById('emailEditBtn');
+    if (emailEditing) {
+      const ta = document.createElement('textarea');
+      ta.className = 'msg-textarea'; ta.rows = 6; ta.id = 'emailTA';
+      ta.value = p.textContent; p.replaceWith(ta); btn.textContent = '✓ done';
+    } else {
+      const ta = document.getElementById('emailTA');
+      const np = document.createElement('p');
+      np.className = 'msg-text'; np.id = 'emailText'; np.textContent = ta.value;
+      ta.replaceWith(np); document.getElementById('emailWords').textContent = wordCount(ta.value) + ' words';
+      btn.textContent = '✎ edit';
+    }
+  }
+}
+
+function toggleStatus(i) {
+  pipeline[i].status = pipeline[i].status === 'Approved' ? 'Sent' : 'Approved';
+  renderPipeline();
+}
+
+function renderPipeline() {
+  document.getElementById('pipelineSection').style.display = 'block';
+  document.getElementById('pipelineCount').textContent = pipeline.length + ' approved';
+  document.getElementById('pipelineBody').innerHTML = pipeline.map((p, i) => `
+    <tr>
+      <td><div class="brand-cell">${p.brandName}</div><div class="handle-cell">@${p.handle}</div></td>
+      <td style="color:var(--text2)">${p.niche}</td>
+      <td class="preview-cell">${p.dm}</td>
+      <td class="preview-cell">${p.email}</td>
+      <td><span class="status-pill ${p.status === 'Sent' ? 'status-sent' : 'status-approved'}" onclick="toggleStatus(${i})">${p.status}</span></td>
+      <td class="time-cell">${p.time}</td>
+    </tr>`).join('');
+}
+
+document.getElementById('brandName').addEventListener('keydown', e => { if (e.key === 'Enter') handleGenerate(); });
+</script>
+</body>
+</html>
