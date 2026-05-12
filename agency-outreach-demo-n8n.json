@@ -1,0 +1,881 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "path": "d47f2960-678f-456e-a7b3-beb851588560",
+        "formTitle": "Generate Outreach",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Brand Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Instagram Handle",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Niche",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Swimwear"
+                  },
+                  {
+                    "option": "Resort Wear"
+                  },
+                  {
+                    "option": "Sustainable Swimwear"
+                  },
+                  {
+                    "option": "Luxury Swimwear"
+                  },
+                  {
+                    "option": "Surf & Active"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Follower Count",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "<10K"
+                  },
+                  {
+                    "option": "10K-100K"
+                  },
+                  {
+                    "option": "100K-500K"
+                  },
+                  {
+                    "option": "500K+"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Market",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "US"
+                  },
+                  {
+                    "option": "EU"
+                  },
+                  {
+                    "option": "SEA"
+                  },
+                  {
+                    "option": "Global"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1d559617-dbdf-4a37-8725-61695a1689c0",
+      "name": "Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        176
+      ],
+      "webhookId": "d47f2960-678f-456e-a7b3-beb851588560"
+    },
+    {
+      "parameters": {
+        "jsCode": "const systemPrompt = `You are an outreach specialist for a premium swimwear influencer agency.\nYour job is to write personalized, warm outreach messages to swimwear brands\ninviting them to collaborate with our curated roster of UGC creators and influencers.\n\nRules:\n- Never sound salesy or templated\n- Reference the brand's niche and vibe naturally\n- Be direct about the value proposition: real creators, real content, real results\n- DM max 150 words, Email max 200 words + subject line\n- Output ONLY valid JSON, no preamble, no markdown fences\n- Sign of as Jason`;\n\nconst userPrompt = `Brand: $input.first().json['Brand Name']\nInstagram: @${$input.first().json['Instagram Handle'] || 'unknown'}\nNiche: $input.first().json.Niche\nFollowers: $input.first().json['Follower Count']\nMarket: $input.first().json.Market\n\nWrite a personalized Instagram DM and cold email for this brand.\n\nOutput format:\n{\n  \"dm\": \"...\",\n  \"email_subject\": \"...\",\n  \"email_body\": \"...\"\n}`;\n\nreturn {\n  systemPrompt,\n  userPrompt,\n  brand_name: $input.first().json['Brand Name'],\n  instagram_handle: $input.first().json['Instagram Handle'] || '',\n  niche: $input.first().json.Niche,\n  follower_count: $input.first().json['Follower Count'],\n  market: $input.first().json.Market\n};"
+      },
+      "id": "097b63c8-e9fe-45d8-8a93-a6251f1ac756",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content[0].text;\nconst clean = raw.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(clean);\n\nconst brand = $('Build Prompt').first().json;\n\nreturn {\n  dm: parsed.dm,\n  email_subject: parsed.email_subject,\n  email_body: parsed.email_body,\n  brand_name: brand.brand_name,\n  handle: brand.instagram_handle,\n  niche: brand.niche,\n  follower_count: brand.follower_count,\n  market: brand.market,\n  status: 'Pending Review',\n  generated_at: new Date().toISOString()\n};"
+      },
+      "id": "e8bb23c7-5da3-4fd7-a84e-03d3bde60569",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Outreach Queue",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Brand Name": "={{ $json.brand_name }}",
+            "Handle": "={{ $json.handle }}",
+            "Niche": "={{ $json.niche }}",
+            "DM": "={{ $json.dm }}",
+            "Email Subject": "={{ $json.email_subject }}",
+            "Email Body": "={{ $json.email_body }}",
+            "Status": "={{ $json.status }}",
+            "Generated At": "={{ $json.generated_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Brand Name",
+              "displayName": "Brand Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Handle",
+              "displayName": "Handle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Niche",
+              "displayName": "Niche",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DM",
+              "displayName": "DM",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Subject",
+              "displayName": "Email Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Body",
+              "displayName": "Email Body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Generated At",
+              "displayName": "Generated At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reply",
+              "displayName": "Reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Classification",
+              "displayName": "Classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "bbcd17ba-45ff-41a8-8631-caa1f7e25540",
+      "name": "Sheets: Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        -160,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8NfXzTSCK3Jm94tu",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"simulated_reply\": \"Hey! We'd love to learn more about your creators. What kind of brands do you typically work with?\",\n  \"brand_name\": {{ $('Parse Response').item.json.brand_name }} ,\n  \"handle\": {{ $('Parse Response').item.json.handle }}\n}\n",
+        "options": {}
+      },
+      "id": "fbbc1faf-0072-40ed-abfc-24992e1bb89f",
+      "name": "Set: Simulate Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        64,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content[0].text;\nconst clean = raw.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(clean);\n\nconst prev = $('Set: Simulate Reply').first().json;\n\nreturn {\n  classification: parsed.classification,\n  reason: parsed.reason,\n  brand_name: prev.brand_name,\n  handle: prev.handle,\n  simulated_reply: prev.simulated_reply\n};"
+      },
+      "id": "6164b6b0-7bf1-4751-85ac-57e33a6bea5b",
+      "name": "Parse Classification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU",
+          "mode": "list",
+          "cachedResultName": "Agency Outreach Demo",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Outreach Queue",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Brand Name": "={{ $json.brand_name }}",
+            "Status": "={{ $json.classification }}",
+            "Classification": "={{ $json.classification }}",
+            "Reply": "={{ $json.simulated_reply }}"
+          },
+          "matchingColumns": [
+            "Brand Name"
+          ],
+          "schema": [
+            {
+              "id": "Brand Name",
+              "displayName": "Brand Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Handle",
+              "displayName": "Handle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Niche",
+              "displayName": "Niche",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DM",
+              "displayName": "DM",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Subject",
+              "displayName": "Email Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Body",
+              "displayName": "Email Body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Generated At",
+              "displayName": "Generated At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reply",
+              "displayName": "Reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Classification",
+              "displayName": "Classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "adb2aec0-535f-4584-b85d-b2e12674a0f4",
+      "name": "Sheets: Update Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        864,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8NfXzTSCK3Jm94tu",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "64b198d8-f2e9-48f3-a30f-1a56885280b2",
+              "leftValue": "={{ $('Parse Classification').item.json.classification }}",
+              "rightValue": "INTERESTED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1088,
+        400
+      ],
+      "id": "86d02a22-cdd5-465a-9dc3-a27f9eaf290e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "jasonkhanani@gmail.com",
+        "subject": "🔥 NEW INTERESTED REPLY",
+        "emailType": "text",
+        "message": "=Brand: {{ $json['Brand Name'] }}\n\nHandle: @{{ $('Parse Classification').item.json.handle }}\n\nTheir reply: \n\"{{ $('Sheets: Update Row').item.json.Reply }}\"\n\nClassification: {{ $('Sheets: Update Row').item.json.Classification }}\n\nReason: {{ $('Parse Classification').item.json.reason }}\n\n→ View in Sheets: https://docs.google.com/spreadsheets/d/1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU/",
+        "options": {
+          "appendAttribution": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1328,
+        384
+      ],
+      "id": "1ad4f062-c1d6-4475-9930-00981c933cda",
+      "name": "Send a message",
+      "webhookId": "ee3fb810-fb15-4062-8356-e8cd78e1448e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ETp0xhF3bCZNQ1ip",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "claude-haiku-4-5-20251001"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.userPrompt }}\n\nBrand: {{ $json.brand_name }}\nInstagram Handle: {{ $json.instagram_handle }}\nNiche: {{ $json.niche }}\nFollower Count: {{ $json.follower_count }}\nMarket: {{ $json.market }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "options": {
+          "system": "={{ $json.systemPrompt }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        256,
+        176
+      ],
+      "id": "af2abd7c-23e9-42f0-983e-e38b7c66c5d9",
+      "name": "Generate Outreach Copy",
+      "credentials": {
+        "anthropicApi": {
+          "id": "znuyS1q0XuI18Gvo",
+          "name": "Swimweare Influencer Agency Demo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "claude-haiku-4-5-20251001"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Classify this reply into exactly one of: INTERESTED, NOT_INTERESTED, FOLLOW_UP, SPAM\\n\\nReply: \\\"{{ $json.simulated_reply }}\\\"\\n\\nOutput ONLY valid JSON: { \\\"classification\\\": \\\"INTERESTED\\\", \\\"reason\\\": \\\"...\\\" }"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        288,
+        400
+      ],
+      "id": "9b67d5e3-aa77-459c-b98d-92f5f29bf7fe",
+      "name": "Classify Brand Interest",
+      "credentials": {
+        "anthropicApi": {
+          "id": "znuyS1q0XuI18Gvo",
+          "name": "Swimweare Influencer Agency Demo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU",
+          "mode": "list",
+          "cachedResultName": "Agency Outreach Demo",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Outreach Queue",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nfUM_i-r3Rvbu-AtNsz-vovhU_nW16EXH8fhvkyATMU/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Brand Name",
+              "lookupValue": "={{ $json.brand_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        832,
+        176
+      ],
+      "id": "11e72b0c-1ac5-4a65-adf2-095589f54352",
+      "name": "Check Brand Exists",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8NfXzTSCK3Jm94tu",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "28259215-15da-487b-9226-04918bcf4606",
+              "leftValue": "={{ $json['Brand Name'] }}",
+              "rightValue": "={{ $('Form Trigger').item.json['Brand Name'] }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1056,
+        176
+      ],
+      "id": "af8447cc-bb8b-42b6-958b-8d40b393f424",
+      "name": "If1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        160
+      ],
+      "id": "dc26768c-0bc8-4c1f-9836-7822d06b39dc",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        576
+      ],
+      "id": "15c8ad2c-dabf-4365-a60b-0e8ebe0c3d27",
+      "name": "No Operation, do nothing1"
+    }
+  ],
+  "connections": {
+    "Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Generate Outreach Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response": {
+      "main": [
+        [
+          {
+            "node": "Check Brand Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets: Append Row": {
+      "main": [
+        [
+          {
+            "node": "Set: Simulate Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Simulate Reply": {
+      "main": [
+        [
+          {
+            "node": "Classify Brand Interest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Classification": {
+      "main": [
+        [
+          {
+            "node": "Sheets: Update Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets: Update Row": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Outreach Copy": {
+      "main": [
+        [
+          {
+            "node": "Parse Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Brand Interest": {
+      "main": [
+        [
+          {
+            "node": "Parse Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Brand Exists": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets: Append Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Form Trigger": [
+      {
+        "Brand Name": "Monday Swimwear",
+        "Instagram Handle": "mondayswimwear",
+        "Niche": "Swimwear",
+        "Follower Count": "10K-100K",
+        "Market": "SEA",
+        "submittedAt": "2026-05-12T03:51:32.913Z",
+        "formMode": "test"
+      }
+    ],
+    "Build Prompt": [
+      {
+        "systemPrompt": "You are an outreach specialist for a premium swimwear influencer agency.\nYour job is to write personalized, warm outreach messages to swimwear brands\ninviting them to collaborate with our curated roster of UGC creators and influencers.\n\nRules:\n- Never sound salesy or templated\n- Reference the brand's niche and vibe naturally\n- Be direct about the value proposition: real creators, real content, real results\n- DM max 150 words, Email max 200 words + subject line\n- Output ONLY valid JSON, no preamble, no markdown fences\n- Sign of as Jason",
+        "userPrompt": "Brand: $input.first().json['Brand Name']\nInstagram: @mondayswimwear\nNiche: $input.first().json.Niche\nFollowers: $input.first().json['Follower Count']\nMarket: $input.first().json.Market\n\nWrite a personalized Instagram DM and cold email for this brand.\n\nOutput format:\n{\n  \"dm\": \"...\",\n  \"email_subject\": \"...\",\n  \"email_body\": \"...\"\n}",
+        "brand_name": "Monday Swimwear",
+        "instagram_handle": "mondayswimwear",
+        "niche": "Swimwear",
+        "follower_count": "10K-100K",
+        "market": "SEA"
+      }
+    ],
+    "Generate Outreach Copy": [
+      {
+        "model": "claude-haiku-4-5-20251001",
+        "id": "msg_01CqASz6XYfiZ87365aLiN7K",
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "```json\n{\n  \"dm\": \"Hey Monday Swimwear team! 👋 Love what you're building in the SEA market—your aesthetic is so fresh. We work with creators who genuinely vibe with brands like yours and produce content that actually converts. Real people, real swimsuits, real engagement. Would love to chat about a collab that feels natural for your audience. Let me know if you're open to it!\",\n  \"email_subject\": \"Authentic Creator Content for Monday Swimwear\",\n  \"email_body\": \"Hi Monday Swimwear,\\n\\nI've been following your growth in SEA and really appreciate the authentic direction you're taking the brand. We partner with UGC creators and micro-influencers who create genuine content that resonates with swimwear audiences—no forced hashtags, just real reviews and real fits.\\n\\nOur roster includes creators who match your vibe perfectly and have track records of driving engagement and sales for similar brands. We handle everything from casting to content delivery, making collabs seamless.\\n\\nWould love to explore a partnership. Happy to share creator portfolios and examples of past campaigns.\\n\\nCheers,\\nJason\"\n}\n```"
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 303,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          },
+          "output_tokens": 277,
+          "service_tier": "standard",
+          "inference_geo": "not_available"
+        }
+      }
+    ],
+    "Classify Brand Interest": [
+      {
+        "content": [
+          {
+            "type": "text",
+            "text": "```json\n{\n  \"classification\": \"INTERESTED\",\n  \"reason\": \"The reply expresses enthusiasm ('We'd love to') and asks a qualifying question about the types of brands worked with, indicating genuine interest in exploring a potential business relationship.\"\n}\n```"
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9f531d6b2b039dfd2afcb8ef576f581043024f7e921889a583ac49c6f8c371bb"
+  }
+}
