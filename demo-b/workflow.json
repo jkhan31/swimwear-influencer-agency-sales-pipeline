@@ -1,0 +1,344 @@
+{
+  "name": "Agency Outreach Demo B",
+  "description": "n8n workflow: Form → Claude generation → Sheets → Reply classification → Sheets update",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerData": {
+          "formTitle": "Generate Outreach",
+          "formDescription": "Enter brand details to generate personalized DM and email",
+          "formFields": {
+            "values": [
+              {
+                "fieldLabel": "Brand Name",
+                "fieldType": "text",
+                "inputType": "text",
+                "placeholder": "e.g. Monday Swimwear",
+                "isRequired": true,
+                "fieldId": "brand_name"
+              },
+              {
+                "fieldLabel": "Instagram Handle",
+                "fieldType": "text",
+                "inputType": "text",
+                "placeholder": "e.g. mondayswimwear",
+                "isRequired": false,
+                "fieldId": "instagram_handle"
+              },
+              {
+                "fieldLabel": "Niche",
+                "fieldType": "dropdown",
+                "placeholder": "Select niche",
+                "isRequired": true,
+                "fieldId": "niche",
+                "options": {
+                  "values": [
+                    { "name": "Swimwear" },
+                    { "name": "Resort Wear" },
+                    { "name": "Sustainable Swimwear" },
+                    { "name": "Luxury Swimwear" },
+                    { "name": "Surf & Active" }
+                  ]
+                }
+              },
+              {
+                "fieldLabel": "Follower Count",
+                "fieldType": "dropdown",
+                "placeholder": "Select range",
+                "isRequired": true,
+                "fieldId": "follower_count",
+                "options": {
+                  "values": [
+                    { "name": "Under 10K" },
+                    { "name": "10K–100K" },
+                    { "name": "100K–500K" },
+                    { "name": "500K+" }
+                  ]
+                }
+              },
+              {
+                "fieldLabel": "Target Market",
+                "fieldType": "dropdown",
+                "placeholder": "Select market",
+                "isRequired": true,
+                "fieldId": "market",
+                "options": {
+                  "values": [
+                    { "name": "US" },
+                    { "name": "EU" },
+                    { "name": "SEA" },
+                    { "name": "Global" }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "id": "node_0",
+      "name": "Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 1,
+      "position": [250, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const systemPrompt = `You are an outreach specialist for a premium swimwear influencer agency.\nYour job is to write personalized, warm outreach messages to swimwear brands\ninviting them to collaborate with our curated roster of UGC creators and influencers.\n\nRules:\n- Never sound salesy or templated\n- Reference the brand's niche and vibe naturally\n- Be direct about the value proposition: real creators, real content, real results\n- DM max 150 words, Email max 200 words + subject line\n- Output ONLY valid JSON, no preamble, no markdown fences`;\n\nconst d = $input.first().json;\n\nconst userPrompt = `Brand: ${d.brand_name}\nInstagram: @${d.instagram_handle || 'unknown'}\nNiche: ${d.niche}\nFollowers: ${d.follower_count}\nMarket: ${d.market}\n\nWrite a personalized Instagram DM and cold email for this brand.\n\nOutput format:\n{\n  \"dm\": \"...\",\n  \"email_subject\": \"...\",\n  \"email_body\": \"...\"\n}`;\n\nreturn {\n  systemPrompt,\n  userPrompt,\n  brand_name: d.brand_name,\n  instagram_handle: d.instagram_handle || '',\n  niche: d.niche,\n  follower_count: d.follower_count,\n  market: d.market\n};"
+      },
+      "id": "node_1",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "credentialsToUse": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 1000,\n  \"system\": \"{{ $json.systemPrompt }}\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.userPrompt }}\"\n    }\n  ]\n}"
+      },
+      "id": "node_2",
+      "name": "Claude API (Generate)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [750, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content[0].text;\nconst clean = raw.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(clean);\n\nconst brand = $('Build Prompt').first().json;\n\nreturn {\n  dm: parsed.dm,\n  email_subject: parsed.email_subject,\n  email_body: parsed.email_body,\n  brand_name: brand.brand_name,\n  handle: brand.instagram_handle,\n  niche: brand.niche,\n  follower_count: brand.follower_count,\n  market: brand.market,\n  status: 'Pending Review',\n  generated_at: new Date().toISOString()\n};"
+      },
+      "id": "node_3",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 100]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "sheetId": "YOUR_SHEET_ID",
+        "sheet": "Outreach Queue",
+        "credentialsToUse": "YOUR_SHEETS_CREDENTIAL_ID",
+        "columns": "brand_name,handle,niche,dm,email_subject,email_body,status,generated_at"
+      },
+      "id": "node_4",
+      "name": "Sheets: Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [1250, 100]
+    },
+    {
+      "parameters": {
+        "mode": "override",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            {
+              "name": "simulated_reply",
+              "value": "Hey! We'd love to learn more about your creators. What kind of brands do you typically work with?"
+            },
+            {
+              "name": "brand_name",
+              "value": "={{ $json.brand_name }}"
+            },
+            {
+              "name": "handle",
+              "value": "={{ $json.handle }}"
+            }
+          ]
+        }
+      },
+      "id": "node_5",
+      "name": "Set: Simulate Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1500, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "credentialsToUse": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 200,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Classify this reply into exactly one of: INTERESTED, NOT_INTERESTED, FOLLOW_UP, SPAM\\n\\nReply: \\\"{{ $json.simulated_reply }}\\\"\\n\\nOutput ONLY valid JSON: { \\\"classification\\\": \\\"INTERESTED\\\", \\\"reason\\\": \\\"...\\\" }\"\n    }\n  ]\n}"
+      },
+      "id": "node_6",
+      "name": "Claude API (Classify)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1750, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content[0].text;\nconst clean = raw.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(clean);\n\nconst prev = $('Set: Simulate Reply').first().json;\n\nreturn {\n  classification: parsed.classification,\n  reason: parsed.reason,\n  brand_name: prev.brand_name,\n  handle: prev.handle,\n  simulated_reply: prev.simulated_reply\n};"
+      },
+      "id": "node_7",
+      "name": "Parse Classification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 100]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "sheetId": "YOUR_SHEET_ID",
+        "sheet": "Outreach Queue",
+        "credentialsToUse": "YOUR_SHEETS_CREDENTIAL_ID",
+        "key": "brand_name",
+        "mode": "autoMapInputData",
+        "columns": "status,simulated_reply,classification",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            {
+              "column": "status",
+              "value": "={{ $json.classification }}"
+            },
+            {
+              "column": "simulated_reply",
+              "value": "={{ $json.simulated_reply }}"
+            },
+            {
+              "column": "classification",
+              "value": "={{ $json.classification }}"
+            }
+          ]
+        }
+      },
+      "id": "node_8",
+      "name": "Sheets: Update Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [2250, 100]
+    }
+  ],
+  "connections": {
+    "node_0": {
+      "main": [
+        [
+          {
+            "node": "node_1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_1": {
+      "main": [
+        [
+          {
+            "node": "node_2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_2": {
+      "main": [
+        [
+          {
+            "node": "node_3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_3": {
+      "main": [
+        [
+          {
+            "node": "node_4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_4": {
+      "main": [
+        [
+          {
+            "node": "node_5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_5": {
+      "main": [
+        [
+          {
+            "node": "node_6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_6": {
+      "main": [
+        [
+          {
+            "node": "node_7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_7": {
+      "main": [
+        [
+          {
+            "node": "node_8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e0f8e0d9-f1c0-4f5e-8b6e-2c3d9f4e5a6b",
+  "meta": {
+    "instanceId": "demo-instance"
+  },
+  "pinData": {}
+}
