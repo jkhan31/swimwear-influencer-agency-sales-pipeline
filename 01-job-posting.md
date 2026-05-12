@@ -2,10 +2,12 @@
 
 ## Original Posting
 
+**Platform:** Upwork (Posted 3 weeks ago)  
 **Company:** Unnamed influencer agency, Bali-based, AI-first  
-**Type:** Ongoing contract, contract-to-hire  
-**Pay:** €500–€2,000/month + commission  
-**Location:** Bali / Indonesia (or relocate within 30 days)
+**Type:** Ongoing project, contract-to-hire opportunity  
+**Pay:** €500–€2,000/month (depending on experience) + commission on closed deals  
+**Location:** Bali / Indonesia (flexible hybrid) or relocate within 30 days  
+**Status:** 5–10 proposals received, currently interviewing
 
 ### What They Do
 A fast-growing influencer agency representing UGC and influencer creators, booking them with premium swimwear brands globally. They use an AI-driven outreach engine (Claude + Clowbot) to send Instagram DMs and emails at scale.
@@ -27,9 +29,31 @@ A fast-growing influencer agency representing UGC and influencer creators, booki
 
 ### Bonus Points
 - Instagram DM outreach at scale (account warmup, avoiding blocks)
-- Email outreach experience (Instantly, Smartlead)
+- Email outreach experience (Instantly, Smartlead, or similar)
 - Background in influencer marketing, UGC, fashion, or e-commerce
 - Portuguese, Spanish, French, or Italian
+
+### What They Offer
+- Modern AI-first tech stack — among the first operators trained on it
+- Direct work with founder; clear path to Head of Sales / Ops
+- Flexible hybrid schedule in Bali
+- Real brands, real creators, real ownership
+- Commission upside on closed deals
+
+### Mandatory Skills (Upwork)
+- Social Media Marketing Automation
+- Advertising Automation
+- CRM Automation
+- Zapier
+- Sales & Marketing
+- Email Campaign Setup
+- n8n
+- AI Builder
+- Make.com
+
+### Preferred Qualifications
+- English: Fluent
+- Location: Indonesia, Philippines (or willing to relocate)
 
 ---
 
@@ -59,10 +83,22 @@ They're an influencer agency trying to scale outreach to swimwear brands without
 - Someone who needs to learn AI tools from scratch
 
 ### Fit Assessment for Jason
-- ✅ AI automations (n8n, Claude Code, nanoclaw agent project)
+
+**Strong Match:**
+- ✅ AI automations (n8n, Claude API, working demo built)
 - ✅ Systems thinking and ops background
 - ✅ Based in Bali / Indonesia
 - ✅ AI chatbot integration at Zalora (68% deflection — directly relevant)
-- ⚠️ No direct B2B cold outreach / sales closing experience
-- ⚠️ No influencer marketing background
-- ⚠️ Google Sheets CRM — needs to be genuinely comfortable at expert level
+- ✅ Demonstrated n8n workflow expertise (agency-outreach-demo-n8n.json)
+- ✅ Claude API integration at scale (Sonnet + Haiku models, JSON parsing, error handling)
+- ✅ Google Sheets API integration (read/write, batch updates)
+
+**Gaps to Address:**
+- ⚠️ No direct B2B cold outreach / sales closing experience (gap, but can be learned)
+- ⚠️ No influencer marketing background (can be learned on the job)
+- ⚠️ Google Sheets CRM expertise — built automation but not expert-level admin
+
+**Mitigation Strategy:**
+- Demo shows end-to-end automation capability (form → Claude outreach → Sheets update → email alert)
+- Proposal emphasizes automation strength (where the hard part is) over sales experience
+- Frames sales gaps as "this role can teach me," emphasizes ability to operate the stack independently
