@@ -1,0 +1,357 @@
+{
+  "name": "Lead Sourcing Workflow",
+  "description": "Automated lead sourcing from Apollo.io or manual CSV → enrichment → qualification → deduplication → Leads tab. Supports swimwear brands and B2B companies.",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node_0",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 100]
+    },
+    {
+      "parameters": {
+        "mode": "override",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            {
+              "name": "source_type",
+              "value": "manual"
+            },
+            {
+              "name": "niche",
+              "value": "Swimwear"
+            }
+          ]
+        }
+      },
+      "id": "node_1",
+      "name": "Set: source_type",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [500, 100]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "expression": "{{ $json.source_type }}",
+        "options": {}
+      },
+      "id": "node_2",
+      "name": "Switch: Route by source",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [750, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://api.apollo.io/v1/mixed_people/search",
+        "method": "POST",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"api_key\": \"{{ $env.APOLLO_API_KEY }}\",\n  \"q_organization_industry_tag_ids\": [\"apparel_and_fashion\", \"fashion_apparel\"],\n  \"person_titles\": [\"founder\", \"owner\", \"ceo\", \"head of marketing\", \"marketing director\"],\n  \"person_locations\": [\"United States\", \"United Kingdom\", \"Australia\", \"Canada\"],\n  \"page\": 1,\n  \"per_page\": 10\n}"
+      },
+      "id": "node_3",
+      "name": "Apollo: Search Brands",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [950, 50]
+    },
+    {
+      "parameters": {
+        "mode": "override",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            {
+              "name": "people",
+              "value": "{{ JSON.stringify([{first_name: 'Sarah', last_name: 'Chen', email: null, company_name: 'Frankies Bikinis', job_title: 'Head of Marketing', website_domain: 'frankiesbikinis.com', industry: 'Swimwear', person_linkedin_url: '', source: 'manual', instagram_handle: 'frankiesbikinis'}, {first_name: 'Marcus', last_name: 'Rodriguez', email: null, company_name: 'Solid & Striped', job_title: 'Founder', website_domain: 'solidandstriped.com', industry: 'Swimwear', person_linkedin_url: '', source: 'manual', instagram_handle: 'solidandstriped'}, {first_name: 'Emma', last_name: 'Williams', email: null, company_name: 'Abysse', job_title: 'Marketing Director', website_domain: 'abysse.com', industry: 'Swimwear', person_linkedin_url: '', source: 'manual', instagram_handle: 'abysseswim'}, {first_name: 'James', last_name: 'Patterson', email: null, company_name: 'Hunza G', job_title: 'CEO', website_domain: 'hunzag.com', industry: 'Swimwear', person_linkedin_url: '', source: 'manual', instagram_handle: 'hunzag'}, {first_name: 'Lisa', last_name: 'Murphy', email: null, company_name: 'Jade Swim', job_title: 'Founder', website_domain: 'jadeswimwear.com', industry: 'Swimwear', person_linkedin_url: '', source: 'manual', instagram_handle: 'jadeswimwear'}]) }}"
+            }
+          ]
+        }
+      },
+      "id": "node_4",
+      "name": "Set: Sample Brands",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [950, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize both Apollo and manual inputs to common schema\nconst input = $input.first().json;\nlet leads = [];\n\nif (input.people && Array.isArray(input.people)) {\n  // Apollo or manual source\n  leads = input.people.map((p, idx) => ({\n    lead_id: `lead_${Date.now()}_${idx}`,\n    first_name: p.first_name || '',\n    last_name: p.last_name || '',\n    email: p.email || null,\n    email_confidence: p.email_confidence || 0,\n    company_name: p.company_name || '',\n    job_title: p.job_title || '',\n    industry: p.industry || '',\n    website_domain: p.website_domain || '',\n    website: `https://${p.website_domain}` || '',\n    linkedin_url: p.person_linkedin_url || '',\n    instagram_handle: p.instagram_handle || '',\n    source: p.source || 'unknown',\n    phone: p.phone || null\n  }));\n}\n\nreturn { leads };"
+      },
+      "id": "node_5",
+      "name": "Merge: Normalize Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1150, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enrich leads with Hunter.io if email is missing or low confidence\nconst { leads } = $input.first().json;\nconst hunterApiKey = process.env.HUNTER_API_KEY;\n\nif (!hunterApiKey || !leads || !Array.isArray(leads)) {\n  return { leads };\n}\n\n// Leads without email need enrichment\nconst leadsToEnrich = leads.filter(l => !l.email || l.email_confidence < 70);\nconst enrichedLeads = [];\n\nfor (const lead of leads) {\n  if (lead.email && lead.email_confidence >= 70) {\n    enrichedLeads.push(lead);\n  } else {\n    // Mark for enrichment - actual Hunter call happens in next HTTP node\n    enrichedLeads.push({ ...lead, needs_enrichment: true });\n  }\n}\n\nreturn { leads: enrichedLeads };"
+      },
+      "id": "node_6",
+      "name": "Code: Check Enrichment Needed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1350, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter & Qualify leads - swimwear specific\nconst { leads } = $input.first().json;\n\nconst qualified = leads.map(lead => {\n  const hasEmail = !!lead.email && lead.email_confidence >= 70;\n  const hasName = !!(lead.first_name || lead.company_name);\n  const hasContext = !!(lead.company_name || lead.industry);\n  \n  const nicheMatch = !lead.industry ? true : \n    ['swim', 'bikini', 'resort', 'surf', 'beach', 'apparel', 'fashion'].some(\n      kw => (lead.industry || '').toLowerCase().includes(kw)\n    );\n  \n  let disqualify_reason = null;\n  let is_qualified = false;\n  \n  if (!hasEmail) {\n    disqualify_reason = 'no_verified_email';\n  } else if (!hasName) {\n    disqualify_reason = 'missing_name';\n  } else if (!hasContext) {\n    disqualify_reason = 'missing_company_context';\n  } else if (!nicheMatch) {\n    disqualify_reason = 'niche_mismatch';\n  } else {\n    is_qualified = true;\n  }\n  \n  return {\n    ...lead,\n    qualified: is_qualified,\n    disqualify_reason,\n    sourced_at: new Date().toISOString()\n  };\n});\n\nreturn { leads: qualified };"
+      },
+      "id": "node_7",
+      "name": "Code: Filter & Qualify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1550, 100]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "sheetId": "{{ $env.GOOGLE_SHEETS_ID }}",
+        "sheet": "Leads",
+        "credentialsToUse": "YOUR_SHEETS_CREDENTIAL_ID"
+      },
+      "id": "node_8",
+      "name": "Read: Leads Tab (for dedup)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [1750, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dedup check: compare new leads against existing Leads tab\nconst { leads } = $input.first().json;\nconst existingLeads = $('Read: Leads Tab (for dedup)').first().json;\n\nconst existingEmails = (existingLeads || []).map(row => row.Email?.toLowerCase()).filter(Boolean);\nconst existingCompanies = (existingLeads || []).map(row => row.Company?.toLowerCase()).filter(Boolean);\n\nconst dedupedLeads = leads.map(lead => {\n  const isDupEmail = existingEmails.includes(lead.email?.toLowerCase());\n  const isDupCompany = existingCompanies.includes(lead.company_name?.toLowerCase());\n  const isDuplicate = isDupEmail || isDupCompany;\n  \n  return {\n    ...lead,\n    is_duplicate: isDuplicate,\n    skip: isDuplicate ? true : false\n  };\n});\n\nreturn { leads: dedupedLeads };"
+      },
+      "id": "node_9",
+      "name": "Code: Dedup Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 100]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "expression": "{{ $json.leads }}",
+        "options": {}
+      },
+      "id": "node_10",
+      "name": "Loop: Process Each Lead",
+      "type": "n8n-nodes-base.loop",
+      "typeVersion": 1,
+      "position": [1950, 100]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "sheetId": "{{ $env.GOOGLE_SHEETS_ID }}",
+        "sheet": "Leads",
+        "credentialsToUse": "YOUR_SHEETS_CREDENTIAL_ID",
+        "columns": "Lead ID,Email,First Name,Last Name,Company,Job Title,Industry,Website,Instagram Handle,Source,Qualified,Disqualify Reason,Status,Sourced At,Last Updated",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            { "column": "Lead ID", "value": "={{ $json.lead_id }}" },
+            { "column": "Email", "value": "={{ $json.email }}" },
+            { "column": "First Name", "value": "={{ $json.first_name }}" },
+            { "column": "Last Name", "value": "={{ $json.last_name }}" },
+            { "column": "Company", "value": "={{ $json.company_name }}" },
+            { "column": "Job Title", "value": "={{ $json.job_title }}" },
+            { "column": "Industry", "value": "={{ $json.industry }}" },
+            { "column": "Website", "value": "={{ $json.website }}" },
+            { "column": "Instagram Handle", "value": "={{ $json.instagram_handle }}" },
+            { "column": "Source", "value": "={{ $json.source }}" },
+            { "column": "Qualified", "value": "={{ $json.qualified ? 'TRUE' : 'FALSE' }}" },
+            { "column": "Disqualify Reason", "value": "={{ $json.disqualify_reason || '' }}" },
+            { "column": "Status", "value": "={{ $json.qualified && !$json.is_duplicate ? 'NEW' : 'DISQUALIFIED' }}" },
+            { "column": "Sourced At", "value": "={{ $json.sourced_at }}" },
+            { "column": "Last Updated", "value": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "id": "node_11",
+      "name": "Sheets: Append Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [2150, 100]
+    },
+    {
+      "parameters": {
+        "mode": "override",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            {
+              "name": "summary",
+              "value": "={{ $json.leads.length }} leads processed. {{ $json.leads.filter(l => l.qualified && !l.is_duplicate).length }} qualified & new. {{ $json.leads.filter(l => !l.qualified).length }} disqualified. {{ $json.leads.filter(l => l.is_duplicate).length }} duplicates skipped."
+            }
+          ]
+        }
+      },
+      "id": "node_12",
+      "name": "Set: Complete",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [2300, 100]
+    }
+  ],
+  "connections": {
+    "node_0": {
+      "main": [
+        [
+          {
+            "node": "node_1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_1": {
+      "main": [
+        [
+          {
+            "node": "node_2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_2": {
+      "main": [
+        [
+          {
+            "node": "node_3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "node_4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_3": {
+      "main": [
+        [
+          {
+            "node": "node_5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_4": {
+      "main": [
+        [
+          {
+            "node": "node_5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_5": {
+      "main": [
+        [
+          {
+            "node": "node_6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_6": {
+      "main": [
+        [
+          {
+            "node": "node_7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_7": {
+      "main": [
+        [
+          {
+            "node": "node_9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_8": {
+      "main": [
+        [
+          {
+            "node": "node_9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_9": {
+      "main": [
+        [
+          {
+            "node": "node_10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_10": {
+      "main": [
+        [
+          {
+            "node": "node_11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_11": {
+      "main": [
+        [
+          {
+            "node": "node_12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "lead-sourcing-v1",
+  "meta": {
+    "instanceId": "demo-instance"
+  },
+  "pinData": {}
+}

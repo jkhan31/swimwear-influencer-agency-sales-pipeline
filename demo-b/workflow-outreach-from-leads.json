@@ -1,0 +1,452 @@
+{
+  "name": "Outreach Generation from Leads",
+  "description": "Read NEW qualified leads from Leads tab → generate personalized email via Claude → classify simulated replies → send alerts. Automated version of Demo B (no form, reads from Sheets).",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node_0",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 100]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "sheetId": "{{ $env.GOOGLE_SHEETS_ID }}",
+        "sheet": "Leads",
+        "credentialsToUse": "YOUR_SHEETS_CREDENTIAL_ID"
+      },
+      "id": "node_1",
+      "name": "Sheets: Read Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [500, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter for NEW qualified leads only\nconst leads = $input.first().json || [];\nconst filtered = leads.filter(row => \n  row.Status === 'NEW' && row.Qualified === 'TRUE'\n);\nreturn filtered;"
+      },
+      "id": "node_2",
+      "name": "Code: Filter NEW Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 100]
+    },
+    {
+      "parameters": {
+        "maxItems": 10
+      },
+      "id": "node_3",
+      "name": "Limit: Max 10",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [950, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const systemPrompt = `You are an outreach specialist for a premium swimwear influencer agency.\nYour job is to write personalized, warm outreach messages to swimwear brands\ninviting them to collaborate with our curated roster of UGC creators and influencers.\n\nRules:\n- Never sound salesy or templated\n- Reference the brand's niche and vibe naturally\n- Be direct about the value proposition: real creators, real content, real results\n- DM max 150 words, Email max 200 words + subject line\n- Output ONLY valid JSON, no preamble, no markdown fences`;\n\nconst lead = $input.first().json;\n\nconst userPrompt = `Brand: ${lead.Company}\nWebsite: ${lead.Website}\nInstagram: @${lead['Instagram Handle'] || 'unknown'}\nIndustry: ${lead.Industry}\nContact: ${lead['First Name']} ${lead['Last Name']}, ${lead['Job Title']}\n\nWrite a personalized Instagram DM and cold email for this brand.\n\nOutput format:\n{\n  \"dm\": \"...\",\n  \"email_subject\": \"...\",\n  \"email_body\": \"...\"\n}`;\n\nreturn {\n  systemPrompt,\n  userPrompt,\n  lead_id: lead['Lead ID'],\n  company: lead.Company,\n  email: lead.Email,\n  first_name: lead['First Name'],\n  last_name: lead['Last Name'],\n  job_title: lead['Job Title'],\n  instagram_handle: lead['Instagram Handle'] || '',\n  industry: lead.Industry,\n  website: lead.Website,\n  source: lead.Source\n};"
+      },
+      "id": "node_4",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1150, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "credentialsToUse": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 1000,\n  \"system\": \"{{ $json.systemPrompt }}\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.userPrompt }}\"\n    }\n  ]\n}"
+      },
+      "id": "node_5",
+      "name": "Claude API (Generate)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1350, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content[0].text;\nconst clean = raw.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(clean);\n\nconst prev = $('Build Prompt').first().json;\n\nreturn {\n  dm: parsed.dm,\n  email_subject: parsed.email_subject,\n  email_body: parsed.email_body,\n  lead_id: prev.lead_id,\n  company: prev.company,\n  email: prev.email,\n  first_name: prev.first_name,\n  last_name: prev.last_name,\n  job_title: prev.job_title,\n  instagram_handle: prev.instagram_handle,\n  industry: prev.industry,\n  website: prev.website,\n  source: prev.source,\n  generated_at: new Date().toISOString()\n};"
+      },
+      "id": "node_6",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1550, 100]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "sheetId": "{{ $env.GOOGLE_SHEETS_ID }}",
+        "sheet": "Leads",
+        "credentialsToUse": "YOUR_SHEETS_CREDENTIAL_ID"
+      },
+      "id": "node_7",
+      "name": "Sheets: Read Leads (for update)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [1750, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find the row in Leads tab that matches this lead_id and update it\nconst lead = $input.first().json;\nconst allLeads = $('Sheets: Read Leads (for update)').first().json || [];\n\n// Find matching row by Lead ID\nconst matchingRow = allLeads.findIndex(row => row['Lead ID'] === lead.lead_id);\n\nreturn {\n  ...lead,\n  rowIndex: matchingRow,\n  status_new: 'OUTREACH_QUEUED',\n  updated_at: new Date().toISOString()\n};"
+      },
+      "id": "node_8",
+      "name": "Code: Find Row Index",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 100]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "sheetId": "{{ $env.GOOGLE_SHEETS_ID }}",
+        "sheet": "Leads",
+        "credentialsToUse": "YOUR_SHEETS_CREDENTIAL_ID",
+        "key": "Lead ID",
+        "mode": "autoMapInputData",
+        "columns": "Status",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            {
+              "column": "Status",
+              "value": "OUTREACH_QUEUED"
+            }
+          ]
+        }
+      },
+      "id": "node_9",
+      "name": "Sheets: Update Status → OUTREACH_QUEUED",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [1950, 100]
+    },
+    {
+      "parameters": {
+        "mode": "override",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            {
+              "name": "simulated_reply",
+              "value": "Hey! We'd love to learn more about your creators. What kind of brands do you typically work with?"
+            },
+            {
+              "name": "lead_id",
+              "value": "={{ $json.lead_id }}"
+            },
+            {
+              "name": "company",
+              "value": "={{ $json.company }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $json.email }}"
+            }
+          ]
+        }
+      },
+      "id": "node_10",
+      "name": "Set: Simulate Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [2150, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "credentialsToUse": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+        "sendBody": true,
+        "bodyParametersJson": "{\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 200,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Classify this reply into exactly one of: INTERESTED, NOT_INTERESTED, FOLLOW_UP, SPAM\\n\\nReply: \\\"{{ $json.simulated_reply }}\\\"\\n\\nOutput ONLY valid JSON: { \\\"classification\\\": \\\"INTERESTED\\\", \\\"reason\\\": \\\"...\\\" }\"\n    }\n  ]\n}"
+      },
+      "id": "node_11",
+      "name": "Claude API (Classify)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [2350, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content[0].text;\nconst clean = raw.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(clean);\n\nconst prev = $('Set: Simulate Reply').first().json;\n\nreturn {\n  classification: parsed.classification,\n  reason: parsed.reason,\n  lead_id: prev.lead_id,\n  company: prev.company,\n  email: prev.email,\n  simulated_reply: prev.simulated_reply\n};"
+      },
+      "id": "node_12",
+      "name": "Parse Classification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2550, 100]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "sheetId": "{{ $env.GOOGLE_SHEETS_ID }}",
+        "sheet": "Leads",
+        "credentialsToUse": "YOUR_SHEETS_CREDENTIAL_ID",
+        "key": "Lead ID",
+        "mode": "autoMapInputData",
+        "columns": "Status",
+        "mappingMode": "defineBelow",
+        "defineBelow": {
+          "values": [
+            {
+              "column": "Status",
+              "value": "={{ $json.classification }}"
+            }
+          ]
+        }
+      },
+      "id": "node_13",
+      "name": "Sheets: Update Classification",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [2750, 100]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "expression": "{{ $json.classification === 'INTERESTED' }}",
+        "options": {}
+      },
+      "id": "node_14",
+      "name": "IF: INTERESTED?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2950, 100]
+    },
+    {
+      "parameters": {
+        "toEmail": "jasonkhanani@gmail.com",
+        "subject": "🎯 Interested Lead: {{ $json.company }}",
+        "textContent": "NEW INTERESTED LEAD\n\nCompany: {{ $json.company }}\nContact: {{ $json.email }}\nClassification Reason: {{ $json.reason }}\n\nReply:\n{{ $json.simulated_reply }}\n\nStatus: INTERESTED"
+      },
+      "id": "node_15",
+      "name": "Gmail: Send Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [3150, 50]
+    },
+    {
+      "parameters": {},
+      "id": "node_16",
+      "name": "No Op",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [3150, 150]
+    }
+  ],
+  "connections": {
+    "node_0": {
+      "main": [
+        [
+          {
+            "node": "node_1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_1": {
+      "main": [
+        [
+          {
+            "node": "node_2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_2": {
+      "main": [
+        [
+          {
+            "node": "node_3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_3": {
+      "main": [
+        [
+          {
+            "node": "node_4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_4": {
+      "main": [
+        [
+          {
+            "node": "node_5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_5": {
+      "main": [
+        [
+          {
+            "node": "node_6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_6": {
+      "main": [
+        [
+          {
+            "node": "node_8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_7": {
+      "main": [
+        [
+          {
+            "node": "node_8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_8": {
+      "main": [
+        [
+          {
+            "node": "node_9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_9": {
+      "main": [
+        [
+          {
+            "node": "node_10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_10": {
+      "main": [
+        [
+          {
+            "node": "node_11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_11": {
+      "main": [
+        [
+          {
+            "node": "node_12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_12": {
+      "main": [
+        [
+          {
+            "node": "node_13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_13": {
+      "main": [
+        [
+          {
+            "node": "node_14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node_14": {
+      "main": [
+        [
+          {
+            "node": "node_15",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "node_16",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "outreach-from-leads-v1",
+  "meta": {
+    "instanceId": "demo-instance"
+  },
+  "pinData": {}
+}
