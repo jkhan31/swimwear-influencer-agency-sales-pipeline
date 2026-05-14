@@ -2,13 +2,64 @@
 
 ## Spreadsheet Setup
 
-Create a new Google Sheet called "Agency Outreach Demo" with two tabs:
-1. **Outreach Queue** — generated messages + classification
-2. **Pipeline** — deal tracking by stage
+Create a new Google Sheet called "Agency Outreach Demo" with three tabs:
+1. **Leads** — sourced, enriched, and qualified leads (NEW → OUTREACH_QUEUED)
+2. **Outreach Queue** — generated messages + classification
+3. **Pipeline** — deal tracking by stage
 
 ---
 
-## Tab 1: Outreach Queue
+## Tab 1: Leads
+
+The source of truth for automated lead sourcing. Populated by the `workflow-lead-sourcing.json` workflow, read by the outreach automation workflow.
+
+### Headers (Row 1)
+
+| Column | Header | Type | Notes |
+|--------|--------|------|-------|
+| A | Lead ID | Text | Auto-generated: `lead_TIMESTAMP_INDEX` |
+| B | Email | Text | Verified email (Apollo or Hunter.io) |
+| C | First Name | Text | From Apollo or manual entry |
+| D | Last Name | Text | From Apollo or manual entry |
+| E | Company | Text | Brand/company name |
+| F | Job Title | Text | Decision maker title (e.g., "Head of Marketing") |
+| G | Industry | Text | Tag or category (e.g., "Swimwear", "Apparel") |
+| H | Website | Text | Company website URL |
+| I | Instagram Handle | Text | IG handle if applicable (for swimwear brands) |
+| J | Source | Text | `apollo`, `manual`, or `gmaps` |
+| K | Qualified | Text | `TRUE` or `FALSE` — passed qualification filter |
+| L | Disqualify Reason | Text | Reason if qualified=FALSE (e.g., "no_verified_email", "missing_name") |
+| M | Status | Text | `NEW` (sourced) → `OUTREACH_QUEUED` (in generation) → `CONTACTED` (email sent) → `REPLIED` (response received) |
+| N | Sourced At | DateTime | ISO timestamp when lead was sourced |
+| O | Last Updated | DateTime | Auto-updated when status changes |
+
+### Example Row (after lead sourcing workflow)
+
+| A | B | C | D | E | F | G | H | I | J | K | L | M | N | O |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| lead_20260514_001 | marketing@frankiesbikinis.com | Sarah | Chen | Frankies Bikinis | Head of Marketing | Swimwear | frankiesbikinis.com | frankiesbikinis | apollo | TRUE | (blank) | NEW | 2026-05-14T10:23:45Z | 2026-05-14T10:23:45Z |
+
+### Data Flow: Sourcing to Outreach
+
+1. **workflow-lead-sourcing.json runs:**
+   - Sources leads from Apollo.io, Outscraper, or manual CSV
+   - Enriches missing emails via Hunter.io
+   - Filters & qualifies (must have email + name + context)
+   - Deduplicates against existing rows
+   - Appends new rows with Status=`NEW` and Qualified=`TRUE` (or Status=`DISQUALIFIED` if failed filters)
+
+2. **workflow-outreach-from-leads.json polls hourly (or manually triggered):**
+   - Reads all rows with Status=`NEW` AND Qualified=`TRUE`
+   - Batches up to 10 leads
+   - Generates personalized email via Claude
+   - Updates Status → `OUTREACH_QUEUED` and appends DM/email columns
+   - Simulates a reply and classifies (INTERESTED/NOT_INTERESTED/FOLLOW_UP/SPAM)
+   - Updates Status → classification value
+   - If INTERESTED: triggers Gmail alert
+
+---
+
+## Tab 2: Outreach Queue
 
 Use this tab structure for the n8n workflow to append and update rows.
 
@@ -35,7 +86,7 @@ Use this tab structure for the n8n workflow to append and update rows.
 
 ---
 
-## Tab 2: Pipeline
+## Tab 3: Pipeline
 
 Optional tab for manual deal tracking. Structure suggested below.
 
@@ -58,13 +109,30 @@ Optional tab for manual deal tracking. Structure suggested below.
 
 ---
 
-## Data Flow in n8n
+## Data Flow in n8n (Full Automation)
 
-1. **After Node 5 (Append to Sheets):** New row appears in Outreach Queue with Status = `Pending Review`
-2. **After Node 9 (Update Sheets):** Existing row updates with:
-   - Column I (Reply): simulated reply text
-   - Column J (Classification): `INTERESTED`, `NOT_INTERESTED`, or `FOLLOW_UP`
-   - Column G (Status): updates to match classification
+Three workflows work together:
+
+1. **workflow-lead-sourcing.json** (runs on demand or scheduled):
+   - Triggers manually or on schedule
+   - Sources leads from Apollo, Outscraper, or manual CSV
+   - Enriches with Hunter.io if email missing
+   - Qualifies leads (email + name + context required)
+   - Deduplicates against existing Leads tab
+   - **Output:** New rows in Leads tab with Status=`NEW`, Qualified=`TRUE` or `FALSE`
+
+2. **workflow-outreach-from-leads.json** (hourly or manual):
+   - Reads Leads tab where Status=`NEW` AND Qualified=`TRUE`
+   - Limits to max 10 leads per batch
+   - Generates personalized DM + email via Claude Sonnet
+   - **Output:** Outreach Queue rows appear with Status=`OUTREACH_QUEUED`, DM, Email Subject, Email Body populated
+   - Simulates a reply and classifies with Claude Haiku
+   - **Output:** Updates Outreach Queue row Status → classification (`INTERESTED`, `NOT_INTERESTED`, `FOLLOW_UP`, `SPAM`)
+
+3. **workflow.json** (original Demo B, form-triggered — optional):
+   - Still works for manual testing or single-brand outreach
+   - Form input → Claude generation → Outreach Queue append
+   - For one-off demos only (automated workflows are preferred)
 
 ---
 
